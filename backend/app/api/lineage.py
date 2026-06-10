@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Query
 
-from app.models.graph import ImpactResponse, LineageResponse, UploadGraphPayload
-from app.services.graph_service import GraphService
+from backend.app.models.graph import ImpactResponse, LineageResponse, UploadGraphPayload
+from backend.app.services.graph_service import GraphService
 
 router = APIRouter()
 
@@ -38,6 +38,16 @@ def validate_graph():
     Returns counts of orphaned nodes and cyclic paths.
     """
     return GraphService.validate_graph()
+
+
+@router.get("/api/v1/lineage/search", response_model=list)
+def search_nodes(q: str = Query(..., min_length=1, description="Search query"), limit: int = Query(20, ge=1, le=100)):
+    """
+    UI-06: Search Functionality
+    Search for nodes by name, type, description, owner, or system.
+    Returns a list of matching nodes with their basic info.
+    """
+    return GraphService.search_nodes(query=q, limit=limit)
 
 
 @router.get("/api/v1/lineage/upstream/{node_id}", response_model=LineageResponse)

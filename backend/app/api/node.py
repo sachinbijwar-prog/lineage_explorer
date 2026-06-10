@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 
-from app.models.graph import NodeData, NodeMetadataUpdate
-from app.services.graph_service import GraphService
+from backend.app.models.graph import NodeData, NodeMetadataUpdate
+from backend.app.services.graph_service import GraphService
 
 router = APIRouter()
 

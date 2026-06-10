@@ -1,6 +1,6 @@
 import time
-from app.core.neo4j import neo4j_conn
-from app.models.graph import UploadGraphPayload
+from backend.app.core.neo4j import neo4j_conn
+from backend.app.models.graph import UploadGraphPayload
 
 # GPH-17: Optional Graph Caching Layer
 _GRAPH_CACHE = {}
@@ -396,6 +396,44 @@ class GraphService:
                 seen_edge_keys.add(key)
 
         return {"nodes": merged_nodes, "edges": merged_edges}
+
+    @staticmethod
+    def search_nodes(query: str, limit: int = 20) -> list:
+        """
+        UI-06: Search Functionality
+        Search for nodes by name, type, description, owner, or system.
+        Returns a list of matching nodes with their basic info.
+        """
+        if not query or not query.strip():
+            return []
+        
+        # Build a case-insensitive search query
+        search_term = query.strip().lower()
+        cypher_query = """
+        MATCH (n)
+        WHERE toLower(n.name) CONTAINS $search_term
+           OR toLower(n.type) CONTAINS $search_term
+           OR toLower(n.description) CONTAINS $search_term
+           OR toLower(n.owner) CONTAINS $search_term
+           OR toLower(n.system) CONTAINS $search_term
+        RETURN n
+        LIMIT $limit
+        """
+        
+        results = []
+        with neo4j_conn.driver.session() as session:
+            result = session.run(cypher_query, search_term=search_term, limit=limit)
+            for record in result:
+                node = record["n"]
+                results.append({
+                    "id": node["name"],
+                    "type": node.get("type", "Unknown"),
+                    "description": node.get("description"),
+                    "owner": node.get("owner"),
+                    "system": node.get("system")
+                })
+        
+        return results
 
     @staticmethod
     def get_impact_analysis(node_id: str, max_depth: int = 10) -> dict:
