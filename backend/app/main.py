@@ -6,6 +6,8 @@ from backend.app.api.health import router as health_router
 from backend.app.api.lineage import router as lineage_router
 from backend.app.api.impact import router as impact_router
 from backend.app.api.node import router as node_router
+from backend.app.api.path import router as path_router
+from backend.app.api.scan import router as scan_router
 from backend.app.services.graph_service import GraphService
 
 
@@ -45,6 +47,8 @@ app.include_router(health_router)
 app.include_router(lineage_router)
 app.include_router(impact_router)
 app.include_router(node_router)
+app.include_router(path_router)
+app.include_router(scan_router)
 
 @app.get("/")
 def root():

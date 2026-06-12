@@ -1,12 +1,21 @@
-import type { LineageResponse, ImpactResponse, LineageDirection } from '../types/graph';
+import type { ImpactResponse, LineageDirection, LineageResponse } from '../types/graph';
 
 const API_BASE_URL = '/api/v1';
 
-async function fetchApi<T>(endpoint: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`);
+async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+
   if (!response.ok) {
-    throw new Error(`API error: ${response.statusText}`);
+    let message = response.statusText;
+    try {
+      const body = await response.json();
+      message = body.detail || message;
+    } catch {
+      // Keep the HTTP status text when the response body is not JSON.
+    }
+    throw new Error(`API error: ${message}`);
   }
+
   return response.json();
 }
 
@@ -18,33 +27,45 @@ export interface SearchResult {
   system?: string;
 }
 
+export interface PathResponse {
+  path: string[];
+}
+
 export const api = {
-  /** Test connection to Neo4j */
   testConnection: () => fetchApi<{ neo4j_status: string }>('/lineage/test'),
 
-  /** Load demo graph data */
-  seedGraph: () => fetchApi<{ status: string }>('/lineage/seed'),
+  seedGraph: () => fetchApi<{ status: string }>('/lineage/seed', { method: 'POST' }),
 
-  /** Get lineage for a node */
   getLineage: (nodeId: string, direction: LineageDirection = 'both', depth: number = 10) =>
-    fetchApi<LineageResponse>(`/lineage/${encodeURIComponent(nodeId)}?direction=${direction}&depth=${depth}`),
+    fetchApi<LineageResponse>(
+      `/lineage/${encodeURIComponent(nodeId)}?direction=${encodeURIComponent(direction)}&depth=${depth}`,
+    ),
 
-  /** Get upstream lineage */
   getUpstreamLineage: (nodeId: string, depth: number = 10) =>
     fetchApi<LineageResponse>(`/lineage/upstream/${encodeURIComponent(nodeId)}?depth=${depth}`),
 
-  /** Get downstream lineage */
   getDownstreamLineage: (nodeId: string, depth: number = 10) =>
     fetchApi<LineageResponse>(`/lineage/downstream/${encodeURIComponent(nodeId)}?depth=${depth}`),
 
-  /** Get impact analysis */
   getImpactAnalysis: (nodeId: string, depth: number = 10) =>
     fetchApi<ImpactResponse>(`/lineage/impact/${encodeURIComponent(nodeId)}?depth=${depth}`),
 
-  /** Validate graph health */
-  validateGraph: () => fetchApi<{ is_valid: boolean; orphan_count: number; cycle_count: number }>('/lineage/validate'),
+  validateGraph: () =>
+    fetchApi<{ is_valid: boolean; orphan_count: number; cycle_count: number }>('/lineage/validate'),
 
-  /** Search nodes by name, type, description, owner, or system */
   searchNodes: (query: string, limit: number = 20) =>
     fetchApi<SearchResult[]>(`/lineage/search?q=${encodeURIComponent(query)}&limit=${limit}`),
+
+  getPath: (sourceId: string, targetId: string, depth: number = 10) =>
+    fetchApi<PathResponse>(
+      `/path/${encodeURIComponent(sourceId)}/${encodeURIComponent(targetId)}?depth=${depth}`,
+    ),
+
+  fetchLineage: (nodeId: string, direction: LineageDirection = 'both', depth: number = 10) =>
+    api.getLineage(nodeId, direction, depth),
+
+  fetchPath: (sourceId: string, targetId: string, depth: number = 10) =>
+    api.getPath(sourceId, targetId, depth),
 };
+
+export default api;

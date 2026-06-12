@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { GraphCanvas } from './components/GraphCanvas';
 import { SearchBar } from './components/SearchBar';
-import { api } from './services/api';
+import PathHighlighter from './components/PathHighlighter';
+import api from './services/api';
 import type { Node, Edge, ImpactSummary } from './types/graph';
 import './App.css';
 
@@ -88,8 +89,9 @@ function App() {
     <div className="app">
       <header className="app-header">
         <h1>Enterprise Lineage Explorer</h1>
-        <div className="header-controls">
+<div className="header-controls">
           <SearchBar onNodeSelect={handleNodeClick} />
+          <PathHighlighter />
           <button onClick={handleSeedGraph} disabled={loading}>
             Seed Demo Graph
           </button>

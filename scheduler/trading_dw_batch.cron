@@ -1,0 +1,25 @@
+APP_HOME=/opt/trading-dw
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+
+00 01 * * 1-5 /opt/trading-dw/shell/dimensions/run_dim_client.sh
+05 01 * * 1-5 /opt/trading-dw/shell/dimensions/run_dim_security.sh
+10 01 * * 1-5 /opt/trading-dw/shell/dimensions/run_dim_calendar.sh
+
+00 02 * * 1-5 /opt/trading-dw/shell/stage/run_fao_stage.sh
+05 02 * * 1-5 /opt/trading-dw/shell/stage/run_cm_stage.sh
+10 02 * * 1-5 /opt/trading-dw/shell/stage/run_cds_stage.sh
+15 02 * * 1-5 /opt/trading-dw/shell/stage/run_com_stage.sh
+
+00 03 * * 1-5 /opt/trading-dw/shell/facts/run_fao_trade_fact.sh
+05 03 * * 1-5 /opt/trading-dw/shell/facts/run_cm_trade_fact.sh
+10 03 * * 1-5 /opt/trading-dw/shell/facts/run_cds_trade_fact.sh
+15 03 * * 1-5 /opt/trading-dw/shell/facts/run_com_trade_fact.sh
+
+00 04 * * 1-5 /opt/trading-dw/shell/main/run_fao_main_orders.sh
+05 04 * * 1-5 /opt/trading-dw/shell/main/run_cm_main_orders.sh
+10 04 * * 1-5 /opt/trading-dw/shell/main/run_cds_main_orders.sh
+15 04 * * 1-5 /opt/trading-dw/shell/main/run_com_main_orders.sh
+
+00 05 * * 1-5 /opt/trading-dw/shell/reporting/run_denorm_client_position.sh
+10 05 * * 1-5 /opt/trading-dw/shell/reporting/run_denorm_customer_holdings.sh

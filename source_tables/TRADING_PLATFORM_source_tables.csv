@@ -1,0 +1,5 @@
+source_system,business_segment,source_table,feed_name,arrival_pattern
+TRADING_PLATFORM,FAO,FAO_S1_RAW_ORDERS,trading_platform_fao_orders,daily_eod_file
+TRADING_PLATFORM,CM,CM_S1_RAW_ORDERS,trading_platform_cm_orders,daily_eod_file
+TRADING_PLATFORM,CDS,CDS_S1_RAW_ORDERS,trading_platform_cds_orders,daily_eod_file
+TRADING_PLATFORM,COM,COM_S1_RAW_ORDERS,trading_platform_com_orders,daily_eod_file

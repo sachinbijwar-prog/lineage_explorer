@@ -398,6 +398,30 @@ class GraphService:
         return {"nodes": merged_nodes, "edges": merged_edges}
 
     @staticmethod
+    def find_shortest_path(source_id: str, target_id: str, max_depth: int = 10) -> list[str]:
+        """
+        Return node IDs for the shortest directed lineage path from source to target.
+        """
+        max_depth = max(1, min(int(max_depth), 50))
+        query = f"""
+        MATCH path = shortestPath((source {{name: $source_id}})-[*1..{max_depth}]->(target {{name: $target_id}}))
+        RETURN [node IN nodes(path) | node.name] AS node_names
+        LIMIT 1
+        """
+
+        with neo4j_conn.driver.session() as session:
+            record = session.run(
+                query,
+                source_id=source_id,
+                target_id=target_id,
+            ).single()
+
+        if not record:
+            raise ValueError(f"No path found from '{source_id}' to '{target_id}' within depth {max_depth}")
+
+        return record["node_names"]
+
+    @staticmethod
     def search_nodes(query: str, limit: int = 20) -> list:
         """
         UI-06: Search Functionality
