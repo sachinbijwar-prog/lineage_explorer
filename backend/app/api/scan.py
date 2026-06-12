@@ -6,7 +6,7 @@ from backend.app.services.scanner.scanner_service import ScannerService
 router = APIRouter()
 
 
-@router.post("/scan", response_model=ScanSummary)
+@router.post("/api/v1/scan", response_model=ScanSummary)
 def scan_metadata(request: ScanRequest):
     try:
         return ScannerService().scan_directory(

@@ -28,7 +28,7 @@ export interface SearchResult {
 }
 
 export interface PathResponse {
-  path: string[];
+  paths: string[][];
 }
 
 export const api = {
@@ -60,6 +60,22 @@ export const api = {
     fetchApi<PathResponse>(
       `/path/${encodeURIComponent(sourceId)}/${encodeURIComponent(targetId)}?depth=${depth}`,
     ),
+
+  triggerScan: (path: string, loadToNeo4j: boolean = true) =>
+    fetchApi<{
+      status: string;
+      tables: number;
+      sql_files: number;
+      shell_scripts: number;
+      cron_jobs: number;
+      relationships: number;
+      loaded_to_neo4j: boolean;
+      errors: string[];
+    }>('/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path, load_to_neo4j: loadToNeo4j }),
+    }),
 
   fetchLineage: (nodeId: string, direction: LineageDirection = 'both', depth: number = 10) =>
     api.getLineage(nodeId, direction, depth),

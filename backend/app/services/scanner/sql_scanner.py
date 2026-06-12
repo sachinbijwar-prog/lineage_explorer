@@ -14,6 +14,7 @@ class SqlScanner:
         re.compile(r"\bMERGE\s+INTO\s+([A-Z0-9_.$`\"]+)", re.IGNORECASE),
     ]
     SOURCE_RE = re.compile(r"\b(?:FROM|JOIN)\s+([A-Z0-9_.$`\"]+)", re.IGNORECASE)
+    CTE_RE = re.compile(r"(?:\bWITH|,)\s*([A-Z0-9_.$`\"]+)\s*(?:\([^)]*\))?\s*AS\s*\(", re.IGNORECASE)
 
     def scan(self, sql_files: list[FileMetadata]) -> tuple[list[SqlScanResult], list[str]]:
         results: list[SqlScanResult] = []
@@ -35,7 +36,8 @@ class SqlScanner:
 
                 for statement in statements:
                     normalized = sqlparse.format(statement, strip_comments=True, keyword_case="upper")
-                    source_tables.update(self.extract_sources(normalized))
+                    ctes = self.extract_ctes(normalized)
+                    source_tables.update(self.extract_sources(normalized, ctes))
                     target_tables.update(self.extract_targets(normalized))
 
                 results.append(
@@ -58,11 +60,17 @@ class SqlScanner:
             targets.update(self.clean_table_name(match) for match in pattern.findall(statement))
         return targets
 
-    def extract_sources(self, statement: str) -> set[str]:
+    def extract_sources(self, statement: str, ctes: set[str]) -> set[str]:
         return {
             self.clean_table_name(match)
             for match in self.SOURCE_RE.findall(statement)
-            if not self.is_subquery_alias(match)
+            if not self.is_subquery_alias(match) and self.clean_table_name(match) not in ctes
+        }
+
+    def extract_ctes(self, statement: str) -> set[str]:
+        return {
+            self.clean_table_name(match)
+            for match in self.CTE_RE.findall(statement)
         }
 
     @staticmethod

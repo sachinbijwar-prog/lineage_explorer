@@ -57,6 +57,37 @@ class Neo4jMetadataLoader:
             logger.exception("Failed to create metadata relationships")
             raise
 
+    def prune_stale_entities(self, active_nodes: list[MetadataNode], active_edges: list[MetadataEdge]) -> None:
+        active_ids = [node.id for node in active_nodes]
+        active_edge_tuples = [[edge.source, edge.target, edge.relationship.value] for edge in active_edges]
+
+        try:
+            with neo4j_conn.driver.session() as session:
+                # 1. Prune relationships between active nodes that are no longer active
+                session.run(
+                    """
+                    MATCH (src)-[r:CRON_TRIGGERS|SHELL_EXECUTES|SQL_READS|SQL_WRITES|DEPENDS_ON]->(tgt)
+                    WHERE NOT [src.id, tgt.id, type(r)] IN $active_edges
+                    DELETE r
+                    """,
+                    active_edges=active_edge_tuples
+                )
+
+                # 2. Prune stale nodes (those not in the currently active scanned IDs)
+                session.run(
+                    """
+                    MATCH (n)
+                    WHERE (n:TABLE OR n:SQL_SCRIPT OR n:SHELL_SCRIPT OR n:CRON_JOB)
+                      AND NOT n.id IN $active_ids
+                    DETACH DELETE n
+                    """,
+                    active_ids=active_ids
+                )
+        except Neo4jError:
+            logger.exception("Failed to prune stale metadata entities")
+            raise
+
     def load(self, nodes: list[MetadataNode], edges: list[MetadataEdge]) -> None:
         self.create_nodes(nodes)
         self.create_relationships(edges)
+        self.prune_stale_entities(nodes, edges)

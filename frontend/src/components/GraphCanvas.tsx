@@ -11,6 +11,7 @@ interface GraphCanvasProps {
   nodes: Node[];
   edges: Edge[];
   onNodeClick?: (nodeId: string) => void;
+  highlightedPaths?: string[][];
 }
 
 // Node color mapping based on type
@@ -33,7 +34,7 @@ const getNodeShape = (type: string): 'rectangle' | 'diamond' | 'ellipse' => {
   return 'ellipse';
 };
 
-export function GraphCanvas({ nodes, edges, onNodeClick }: GraphCanvasProps) {
+export function GraphCanvas({ nodes, edges, onNodeClick, highlightedPaths }: GraphCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -125,7 +126,7 @@ export function GraphCanvas({ nodes, edges, onNodeClick }: GraphCanvasProps) {
           },
         },
         {
-          selector: 'node:highlighted',
+          selector: 'node.highlighted',
           style: {
             'border-width': 4,
             'border-color': '#f59e0b',
@@ -133,7 +134,7 @@ export function GraphCanvas({ nodes, edges, onNodeClick }: GraphCanvasProps) {
           },
         },
         {
-          selector: 'edge:highlighted',
+          selector: 'edge.highlighted',
           style: {
             width: 4,
             'line-color': '#f59e0b',
@@ -236,6 +237,55 @@ export function GraphCanvas({ nodes, edges, onNodeClick }: GraphCanvasProps) {
       }
     };
   }, [initializeGraph]);
+
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+
+    if (highlightedPaths && highlightedPaths.length > 0) {
+      const pathNodes = new Set<string>();
+      highlightedPaths.forEach(path => {
+        path.forEach(nodeId => pathNodes.add(nodeId));
+      });
+
+      const pathEdges = new Set<string>();
+      highlightedPaths.forEach(path => {
+        for (let i = 0; i < path.length - 1; i++) {
+          const u = path[i];
+          const v = path[i + 1];
+          cy.edges().forEach(edge => {
+            const src = edge.data('source');
+            const tgt = edge.data('target');
+            if ((src === u && tgt === v) || (src === v && tgt === u)) {
+              pathEdges.add(edge.id());
+            }
+          });
+        }
+      });
+
+      cy.elements().forEach((ele: any) => {
+        if (ele.isNode()) {
+          if (pathNodes.has(ele.id())) {
+            ele.addClass('highlighted');
+            ele.removeClass('dimmed');
+          } else {
+            ele.removeClass('highlighted');
+            ele.addClass('dimmed');
+          }
+        } else if (ele.isEdge()) {
+          if (pathEdges.has(ele.id())) {
+            ele.addClass('highlighted');
+            ele.removeClass('dimmed');
+          } else {
+            ele.removeClass('highlighted');
+            ele.addClass('dimmed');
+          }
+        }
+      });
+    } else {
+      cy.elements().removeClass('highlighted').removeClass('dimmed');
+    }
+  }, [highlightedPaths, nodes, edges]);
 
   return (
     <div className="graph-canvas-container">

@@ -15,6 +15,7 @@ function App() {
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const [impactSummary, setImpactSummary] = useState<ImpactSummary | null>(null);
   const [viewMode, setViewMode] = useState<'lineage' | 'impact'>('lineage');
+  const [highlightedPaths, setHighlightedPaths] = useState<string[][]>([]);
 
   // Default start node for demo
   const DEFAULT_NODE = 'sales_orders';
@@ -72,6 +73,21 @@ function App() {
     }
   };
 
+  const handleScanWorkspace = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await api.triggerScan('c:/git/lineage_explorer', true);
+      setStatus(`Scan completed: ${result.status} (Tables: ${result.tables}, SQL: ${result.sql_files}, Shell: ${result.shell_scripts}, Cron: ${result.cron_jobs}, Edges: ${result.relationships})`);
+      // Focus on FAO_TRADE_FACT to immediately show the scanned pipeline
+      await loadLineage('TABLE:FAO_TRADE_FACT');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to scan workspace');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleNodeClick = (nodeId: string) => {
     // Only reload if clicking a different node or if no node is selected
     if (nodeId !== selectedNode) {
@@ -89,11 +105,14 @@ function App() {
     <div className="app">
       <header className="app-header">
         <h1>Enterprise Lineage Explorer</h1>
-<div className="header-controls">
+        <div className="header-controls">
           <SearchBar onNodeSelect={handleNodeClick} />
-          <PathHighlighter />
+          <PathHighlighter onPathsHighlight={setHighlightedPaths} />
           <button onClick={handleSeedGraph} disabled={loading}>
             Seed Demo Graph
+          </button>
+          <button onClick={handleScanWorkspace} disabled={loading}>
+            Scan Workspace
           </button>
           <button onClick={() => loadLineage(DEFAULT_NODE)} disabled={loading}>
             Reset View
@@ -112,6 +131,7 @@ function App() {
             nodes={nodes}
             edges={edges}
             onNodeClick={handleNodeClick}
+            highlightedPaths={highlightedPaths}
           />
         </div>
 

@@ -199,10 +199,14 @@ class GraphService:
 
     @staticmethod
     def _map_node(neo4j_node) -> dict:
-        """Map a Neo4j node object to a Cytoscape-compatible data dict."""
+        """Map a Neo4j node object to a Cytoscape-compatible data dict.
+        Scanner nodes use `name` as the display label but may have a prefixed `id`
+        (e.g. TABLE:CDS_TRADE_FACT). We always use `name` as the Cytoscape node ID
+        so that lineage traversal (which matches on name) stays consistent.
+        """
         return {
             "data": {
-                "id":          neo4j_node["name"],
+                "id":          neo4j_node.get("name") or neo4j_node.get("id", "Unknown"),
                 "type":        neo4j_node.get("type", "Unknown"),
                 "description": neo4j_node.get("description"),
                 "owner":       neo4j_node.get("owner"),
@@ -212,8 +216,10 @@ class GraphService:
 
     @staticmethod
     def _fetch_start_node(node_id: str) -> dict:
-        """Fetch properties for the traversal start node from Neo4j."""
-        query = "MATCH (n {name: $node_id}) RETURN n LIMIT 1"
+        """Fetch properties for the traversal start node from Neo4j.
+        Matches by `name` (demo/API-ingested nodes) or `id` (scanner-loaded nodes).
+        """
+        query = "MATCH (n) WHERE n.name = $node_id OR n.id = $node_id RETURN n LIMIT 1"
         with neo4j_conn.driver.session() as session:
             result = session.run(query, node_id=node_id)
             record = result.single()
@@ -276,36 +282,57 @@ class GraphService:
         seen_nodes = {node_id}
         seen_edges = set()
 
-        # max_depth must be injected as a literal integer — Cypher does not allow
-        # parameters inside variable-length path bounds (*1..N).
-        upstream_query = f"""
-        MATCH path = (ancestor)-[:READ_BY|WRITES_TO|DEPENDS_ON|TRIGGER_BY*1..{max_depth}]->(start {{name: $node_id}})
+        # DEPENDS_ON direction: FACT_TABLE -[DEPENDS_ON]-> DIM_TABLE
+        # (the dependent points TOWARD its source).
+        #
+        # Upstream = "what contributes to this node?"  Two semantic layers:
+        #
+        # Layer 1 – Execution chain (things that PRODUCE / SCHEDULE the start node).
+        #   These relationships all point INTO the start node, so traverse INCOMING.
+        #   e.g. SQL_SCRIPT -[SQL_WRITES]-> TABLE
+        #        SHELL      -[SHELL_EXECUTES]-> SQL_SCRIPT
+        #        CRON       -[CRON_TRIGGERS]->  SHELL
+        #        Also includes legacy demo-graph types: READ_BY, WRITES_TO, TRIGGER_BY
+        #
+        # Layer 2 – Data sources (tables / objects the start node READS FROM).
+        #   The scanner stores: START_TABLE -[DEPENDS_ON]-> SOURCE_TABLE
+        #   so we traverse OUTGOING DEPENDS_ON / SQL_READS to find the sources.
+        max_depth = max(1, min(int(max_depth), 50))
+
+        exec_chain_query = f"""
+        MATCH (start) WHERE start.name = $node_id OR start.id = $node_id
+        MATCH path = (ancestor)-[:READ_BY|WRITES_TO|SQL_WRITES|CRON_TRIGGERS|SHELL_EXECUTES|TRIGGER_BY*1..{max_depth}]->(start)
         RETURN nodes(path) AS path_nodes, relationships(path) AS path_rels
         """
 
-        # Result must be consumed INSIDE the session block — session closes on exit.
-        with neo4j_conn.driver.session() as session:
-            result = session.run(upstream_query, node_id=node_id)
+        data_sources_query = f"""
+        MATCH (start) WHERE start.name = $node_id OR start.id = $node_id
+        MATCH path = (start)-[:DEPENDS_ON|SQL_READS*1..{max_depth}]->(source)
+        RETURN nodes(path) AS path_nodes, relationships(path) AS path_rels
+        """
 
-            for record in result:
+        def _collect(session, query):
+            for record in session.run(query, node_id=node_id):
                 path_nodes = record["path_nodes"]
-                path_rels = record["path_rels"]
-
+                path_rels  = record["path_rels"]
                 for node in path_nodes:
-                    node_name = node["name"]
+                    node_name = node.get("name") or node.get("id", "")
                     if node_name not in seen_nodes:
                         nodes.append(GraphService._map_node(node))
                         seen_nodes.add(node_name)
-
                 for i, rel in enumerate(path_rels):
                     if i + 1 < len(path_nodes):
-                        src = path_nodes[i]["name"]
-                        tgt = path_nodes[i + 1]["name"]
+                        src = path_nodes[i].get("name") or path_nodes[i].get("id", "")
+                        tgt = path_nodes[i + 1].get("name") or path_nodes[i + 1].get("id", "")
                         rel_type = rel.type
                         edge_key = (src, tgt, rel_type)
                         if edge_key not in seen_edges:
                             edges.append({"data": {"source": src, "target": tgt, "relationship": rel_type}})
                             seen_edges.add(edge_key)
+
+        with neo4j_conn.driver.session() as session:
+            _collect(session, exec_chain_query)
+            _collect(session, data_sources_query)
 
         result_dict = {"nodes": nodes, "edges": edges}
         GraphService._set_cache(cache_key, result_dict)
@@ -323,36 +350,53 @@ class GraphService:
         seen_nodes = {node_id}
         seen_edges = set()
 
-        # Downstream: start node radiates outward — follow relationships forward.
-        # max_depth injected as a literal integer (Cypher restriction on path bounds).
-        downstream_query = f"""
-        MATCH path = (start {{name: $node_id}})-[:READ_BY|WRITES_TO|DEPENDS_ON|TRIGGER_BY*1..{max_depth}]->(descendant)
+        # Downstream = "what does this node impact?"  Two semantic layers:
+        #
+        # Layer 1 – Dependents (tables / objects that DEPEND ON the start node).
+        #   The scanner stores: DEPENDENT -[DEPENDS_ON|SQL_READS]-> START_NODE
+        #   so we traverse INCOMING DEPENDS_ON / SQL_READS to find all dependents.
+        #   This is the critical direction for impact analysis on a DIM/source table.
+        #
+        # Layer 2 – Execution outputs (what the start node triggers / produces).
+        #   e.g. SQL_SCRIPT -[SQL_WRITES]-> OUTPUT_TABLE
+        #        CRON       -[CRON_TRIGGERS]-> SHELL
+        #   These relationships originate FROM the start node, so traverse OUTGOING.
+        max_depth = max(1, min(int(max_depth), 50))
+
+        dependents_query = f"""
+        MATCH (start) WHERE start.name = $node_id OR start.id = $node_id
+        MATCH path = (dependent)-[:DEPENDS_ON|SQL_READS*1..{max_depth}]->(start)
         RETURN nodes(path) AS path_nodes, relationships(path) AS path_rels
         """
 
-        # Result must be consumed INSIDE the session block — session closes on exit.
-        with neo4j_conn.driver.session() as session:
-            result = session.run(downstream_query, node_id=node_id)
+        exec_outputs_query = f"""
+        MATCH (start) WHERE start.name = $node_id OR start.id = $node_id
+        MATCH path = (start)-[:SQL_WRITES|CRON_TRIGGERS|SHELL_EXECUTES|WRITES_TO|READ_BY|TRIGGER_BY*1..{max_depth}]->(output)
+        RETURN nodes(path) AS path_nodes, relationships(path) AS path_rels
+        """
 
-            for record in result:
+        def _collect(session, query):
+            for record in session.run(query, node_id=node_id):
                 path_nodes = record["path_nodes"]
-                path_rels = record["path_rels"]
-
+                path_rels  = record["path_rels"]
                 for node in path_nodes:
-                    node_name = node["name"]
+                    node_name = node.get("name") or node.get("id", "")
                     if node_name not in seen_nodes:
                         nodes.append(GraphService._map_node(node))
                         seen_nodes.add(node_name)
-
                 for i, rel in enumerate(path_rels):
                     if i + 1 < len(path_nodes):
-                        src = path_nodes[i]["name"]
-                        tgt = path_nodes[i + 1]["name"]
+                        src = path_nodes[i].get("name") or path_nodes[i].get("id", "")
+                        tgt = path_nodes[i + 1].get("name") or path_nodes[i + 1].get("id", "")
                         rel_type = rel.type
                         edge_key = (src, tgt, rel_type)
                         if edge_key not in seen_edges:
                             edges.append({"data": {"source": src, "target": tgt, "relationship": rel_type}})
                             seen_edges.add(edge_key)
+
+        with neo4j_conn.driver.session() as session:
+            _collect(session, dependents_query)
+            _collect(session, exec_outputs_query)
 
         result_dict = {"nodes": nodes, "edges": edges}
         GraphService._set_cache(cache_key, result_dict)
@@ -398,28 +442,41 @@ class GraphService:
         return {"nodes": merged_nodes, "edges": merged_edges}
 
     @staticmethod
-    def find_shortest_path(source_id: str, target_id: str, max_depth: int = 10) -> list[str]:
+    def find_shortest_paths(source_id: str, target_id: str, max_depth: int = 10) -> list[list[str]]:
         """
-        Return node IDs for the shortest directed lineage path from source to target.
+        Return all shortest undirected lineage paths between source and target nodes.
+        Matches by name or id.
         """
+        if source_id == target_id:
+            with neo4j_conn.driver.session() as session:
+                res = session.run(
+                    "MATCH (n) WHERE n.name = $sid OR n.id = $sid RETURN COALESCE(n.name, n.id) AS name LIMIT 1",
+                    sid=source_id
+                ).single()
+                if res:
+                    return [[res["name"]]]
+            raise ValueError(f"Node '{source_id}' not found in the graph.")
+
         max_depth = max(1, min(int(max_depth), 50))
         query = f"""
-        MATCH path = shortestPath((source {{name: $source_id}})-[*1..{max_depth}]->(target {{name: $target_id}}))
-        RETURN [node IN nodes(path) | node.name] AS node_names
-        LIMIT 1
+        MATCH (source) WHERE source.name = $source_id OR source.id = $source_id
+        MATCH (target) WHERE target.name = $target_id OR target.id = $target_id
+        MATCH path = allShortestPaths((source)-[*1..{max_depth}]-(target))
+        RETURN [node IN nodes(path) | COALESCE(node.name, node.id)] AS node_names
         """
 
         with neo4j_conn.driver.session() as session:
-            record = session.run(
+            result = session.run(
                 query,
                 source_id=source_id,
                 target_id=target_id,
-            ).single()
+            )
+            paths = [record["node_names"] for record in result]
 
-        if not record:
-            raise ValueError(f"No path found from '{source_id}' to '{target_id}' within depth {max_depth}")
+        if not paths:
+            raise ValueError(f"No path found between '{source_id}' and '{target_id}' within depth {max_depth}")
 
-        return record["node_names"]
+        return paths
 
     @staticmethod
     def search_nodes(query: str, limit: int = 20) -> list:
