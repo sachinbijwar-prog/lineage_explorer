@@ -56,6 +56,9 @@ export const api = {
   searchNodes: (query: string, limit: number = 20) =>
     fetchApi<SearchResult[]>(`/lineage/search?q=${encodeURIComponent(query)}&limit=${limit}`),
 
+  getAllNodes: () =>
+    fetchApi<SearchResult[]>('/lineage/nodes'),
+
   getPath: (sourceId: string, targetId: string, depth: number = 10) =>
     fetchApi<PathResponse>(
       `/path/${encodeURIComponent(sourceId)}/${encodeURIComponent(targetId)}?depth=${depth}`,

@@ -40,6 +40,14 @@ def validate_graph():
     return GraphService.validate_graph()
 
 
+@router.get("/api/v1/lineage/nodes", response_model=list)
+def get_all_nodes():
+    """
+    Returns all nodes in the database.
+    """
+    return GraphService.get_all_nodes()
+
+
 @router.get("/api/v1/lineage/search", response_model=list)
 def search_nodes(q: str = Query(..., min_length=1, description="Search query"), limit: int = Query(20, ge=1, le=100)):
     """

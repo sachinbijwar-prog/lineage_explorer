@@ -517,6 +517,30 @@ class GraphService:
         return results
 
     @staticmethod
+    def get_all_nodes() -> list:
+        cypher_query = """
+        MATCH (n)
+        RETURN n.name AS id,
+               COALESCE(n.type, labels(n)[0]) AS type,
+               n.description AS description,
+               n.owner AS owner,
+               n.system AS system
+        ORDER BY n.name ASC
+        """
+        results = []
+        with neo4j_conn.driver.session() as session:
+            result = session.run(cypher_query)
+            for record in result:
+                results.append({
+                    "id": record["id"],
+                    "type": record["type"] or "Unknown",
+                    "description": record.get("description"),
+                    "owner": record.get("owner"),
+                    "system": record.get("system")
+                })
+        return results
+
+    @staticmethod
     def get_impact_analysis(node_id: str, max_depth: int = 10) -> dict:
         """
         Impact Analysis Engine.

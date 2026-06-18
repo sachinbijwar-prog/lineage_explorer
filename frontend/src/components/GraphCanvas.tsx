@@ -16,21 +16,39 @@ interface GraphCanvasProps {
 
 // Node color mapping based on type
 const getNodeColor = (type: string): string => {
-  const assetTypes = ['hive_table', 'flat_file', 'handshake_file', 'trigger_file'];
-  const processTypes = ['spark_job', 'beeline', 'shell_script'];
-
-  if (assetTypes.includes(type)) return '#3b82f6'; // blue
-  if (processTypes.includes(type)) return '#10b981'; // green
-  return '#6b7280'; // gray
+  const t = (type || '').toLowerCase();
+  
+  if (t === 'table' || t === 'hive_table' || t === 'flat_file' || t === 'handshake_file' || t === 'trigger_file') {
+    return '#38bdf8'; // bright cyan-blue for tables/files
+  }
+  if (t === 'sql_script' || t === 'spark_job' || t === 'beeline') {
+    return '#34d399'; // emerald green for SQL/query scripts
+  }
+  if (t === 'shell_script') {
+    return '#a78bfa'; // lavender purple for orchestrators/scripts
+  }
+  if (t === 'cron_job') {
+    return '#fbbf24'; // amber/orange for crons
+  }
+  return '#94a3b8'; // slate gray fallback
 };
 
 // Node shape mapping based on type
-const getNodeShape = (type: string): 'rectangle' | 'diamond' | 'ellipse' => {
-  const assetTypes = ['hive_table', 'flat_file', 'handshake_file', 'trigger_file'];
-  const processTypes = ['spark_job', 'beeline', 'shell_script'];
+const getNodeShape = (type: string): 'rectangle' | 'diamond' | 'roundrectangle' | 'octagon' | 'ellipse' => {
+  const t = (type || '').toLowerCase();
 
-  if (assetTypes.includes(type)) return 'rectangle';
-  if (processTypes.includes(type)) return 'diamond';
+  if (t === 'table' || t === 'hive_table' || t === 'flat_file' || t === 'handshake_file' || t === 'trigger_file') {
+    return 'rectangle';
+  }
+  if (t === 'sql_script' || t === 'spark_job' || t === 'beeline') {
+    return 'diamond';
+  }
+  if (t === 'shell_script') {
+    return 'roundrectangle';
+  }
+  if (t === 'cron_job') {
+    return 'octagon';
+  }
   return 'ellipse';
 };
 
@@ -82,9 +100,10 @@ export function GraphCanvas({ nodes, edges, onNodeClick, highlightedPaths }: Gra
             'text-halign': 'center',
             'text-wrap': 'wrap',
             'text-max-width': '70px',
-            'font-size': '11px',
-            'text-outline-color': '#ffffff',
-            'text-outline-width': 1,
+            'font-size': '10px',
+            'font-weight': 'bold',
+            'font-family': 'Inter, sans-serif',
+            color: '#0f172a',
             shape: (ele: cytoscape.NodeSingular) => getNodeShape(ele.data('type') as string),
             width: '90px',
             height: '70px',
@@ -109,13 +128,18 @@ export function GraphCanvas({ nodes, edges, onNodeClick, highlightedPaths }: Gra
           selector: 'edge',
           style: {
             width: 2,
-            'line-color': '#9ca3af',
-            'target-arrow-color': '#9ca3af',
+            'line-color': '#4b5563',
+            'target-arrow-color': '#4b5563',
             'target-arrow-shape': 'triangle',
             'curve-style': 'bezier',
             label: 'data(label)',
-            'font-size': '10px',
+            'font-size': '9px',
             'text-rotation': 'autorotate',
+            color: '#94a3b8',
+            'font-family': 'Inter, sans-serif',
+            'text-background-color': '#0b0f19',
+            'text-background-opacity': 0.95,
+            'text-background-padding': '3px',
           },
         },
         {
