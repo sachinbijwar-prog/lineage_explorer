@@ -1,8 +1,8 @@
 # Enterprise Dependency & Lineage Explorer – POC Tracker
 
-**Version:** 0.3
-**Date:** 12-Jun-2026
-**Status:** Demo Ready (Neo4j-based POC)
+**Version:** 0.5
+**Date:** 19-Jun-2026
+**Status:** Ingestion Framework + SQL & Informatica Connectors Ready
 
 ---
 
@@ -18,6 +18,7 @@
 | Frontend (React + Cytoscape)    | Complete       | 100%       |
 | Lineage Features                | Complete       | 100%       |
 | Impact Analysis                 | Complete       | 100%       |
+| Ingestion & SQL Connector       | ✅ Complete     | 100%       |
 
 ---
 
@@ -141,6 +142,25 @@
 | LIN-03 | End-to-End Impact Analysis      | ✅ Completed |
 | LIN-04 | Path Highlighting               | Complete |
 
+# Phase 8 — Generic Metadata Ingestion Framework & SQL Connector
+
+| ID     | Task                                                  | Status      |
+| ------ | ----------------------------------------------------- | ----------- |
+| ING-01 | Canonical Metadata Models & NodeTypes Enum             | ✅ Complete |
+| ING-02 | Base Connector Interface                              | ✅ Complete |
+| ING-03 | SQL Extractor (Directory scanning & reading)          | ✅ Complete |
+| ING-04 | SQL Parser (`sqlglot`-based AST, CTE & alias handling)| ✅ Complete |
+| ING-05 | Neo4j Loader (Batch transactions & indexes)           | ✅ Complete |
+| ING-06 | Informatica Connector Placeholder                    | ✅ Complete |
+| ING-07 | Lineage Service Orchestration                         | ✅ Complete |
+| ING-08 | Ingestion & Graph API Endpoints                       | ✅ Complete |
+| ING-09 | Traversal Engine Integration (`POPULATES` / `FEEDS`)  | ✅ Complete |
+| ING-10 | Enterprise SQL Sample Sets Generation                 | ✅ Complete |
+| ING-11 | Informatica XML Extractor & Parser                    | ✅ Complete |
+| ING-12 | Informatica XML Ingestion API Endpoints               | ✅ Complete |
+| ING-13 | UI Ingest & Catalog Support for Workflows & Mappings   | ✅ Complete |
+| ING-14 | Sample Informatica XML Workflows & Test Suite         | ✅ Complete |
+
 ---
 
 # Key Milestones
@@ -152,6 +172,7 @@
 | API Layer Complete   | ✅ Complete     |
 | UI Integration       | Complete       |
 | Impact Analysis      | Complete       |
+| Ingestion & SQL Connector | ✅ Complete     |
 | Demo Ready POC       | Complete       |
 
 ---

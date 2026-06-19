@@ -301,7 +301,7 @@ class GraphService:
 
         exec_chain_query = f"""
         MATCH (start) WHERE start.name = $node_id OR start.id = $node_id
-        MATCH path = (ancestor)-[:READ_BY|WRITES_TO|SQL_WRITES|CRON_TRIGGERS|SHELL_EXECUTES|TRIGGER_BY*1..{max_depth}]->(start)
+        MATCH path = (ancestor)-[:READ_BY|WRITES_TO|SQL_WRITES|CRON_TRIGGERS|SHELL_EXECUTES|TRIGGER_BY|POPULATES|FEEDS|EXECUTES*1..{max_depth}]->(start)
         RETURN nodes(path) AS path_nodes, relationships(path) AS path_rels
         """
 
@@ -371,7 +371,7 @@ class GraphService:
 
         exec_outputs_query = f"""
         MATCH (start) WHERE start.name = $node_id OR start.id = $node_id
-        MATCH path = (start)-[:SQL_WRITES|CRON_TRIGGERS|SHELL_EXECUTES|WRITES_TO|READ_BY|TRIGGER_BY*1..{max_depth}]->(output)
+        MATCH path = (start)-[:SQL_WRITES|CRON_TRIGGERS|SHELL_EXECUTES|WRITES_TO|READ_BY|TRIGGER_BY|POPULATES|FEEDS|EXECUTES*1..{max_depth}]->(output)
         RETURN nodes(path) AS path_nodes, relationships(path) AS path_rels
         """
 

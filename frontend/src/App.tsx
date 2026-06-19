@@ -28,6 +28,8 @@ function App() {
     SQL_SCRIPT: true,
     SHELL_SCRIPT: false,
     CRON_JOB: false,
+    WORKFLOW: true,
+    MAPPING: true,
     OTHER: false,
   });
 
@@ -97,6 +99,7 @@ function App() {
       setStatus(`Graph seeded: ${result.status}`);
       await loadDiagnostics();
       await loadLineage(DEFAULT_NODE);
+      setCurrentPage('explorer');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to seed graph');
     } finally {
@@ -112,8 +115,41 @@ function App() {
       setStatus(`Scan completed: ${result.status} (Tables: ${result.tables}, SQL: ${result.sql_files}, Shell: ${result.shell_scripts}, Cron: ${result.cron_jobs}, Edges: ${result.relationships})`);
       await loadDiagnostics();
       await loadLineage('TABLE:FAO_TRADE_FACT');
+      setCurrentPage('explorer');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to scan workspace');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleIngestSql = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await api.ingestSql();
+      setStatus(`SQL Ingestion completed: created ${result.nodes_created} nodes and ${result.relationships_created} relationships`);
+      await loadDiagnostics();
+      await loadLineage('FACT_SALES');
+      setCurrentPage('explorer');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to ingest SQL');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleIngestInformatica = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await api.ingestInformatica();
+      setStatus(`Informatica Ingestion completed: created ${result.nodes_created} nodes and ${result.relationships_created} relationships`);
+      await loadDiagnostics();
+      await loadLineage('WF_SALES_DAILY_LOAD');
+      setCurrentPage('explorer');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to ingest Informatica XML');
     } finally {
       setLoading(false);
     }
@@ -137,6 +173,8 @@ function App() {
       SQL_SCRIPT: [],
       SHELL_SCRIPT: [],
       CRON_JOB: [],
+      WORKFLOW: [],
+      MAPPING: [],
       OTHER: [],
     };
 
@@ -157,6 +195,10 @@ function App() {
         categories.SHELL_SCRIPT.push(node);
       } else if (type.includes('CRON') || type.includes('CRON_JOB')) {
         categories.CRON_JOB.push(node);
+      } else if (type.includes('WORKFLOW')) {
+        categories.WORKFLOW.push(node);
+      } else if (type.includes('MAPPING')) {
+        categories.MAPPING.push(node);
       } else {
         categories.OTHER.push(node);
       }
@@ -218,9 +260,11 @@ function App() {
               <p className="stat-desc">
                 Total catalog nodes successfully scanned and parsed in the lineage graph.
               </p>
-              <div className="card-action" style={{ display: 'flex', gap: '0.5rem' }}>
+              <div className="card-action" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <button onClick={handleSeedGraph} className="secondary-btn btn-sm" disabled={loading}>Seed Demo</button>
                 <button onClick={handleScanWorkspace} className="secondary-btn btn-sm" disabled={loading}>Scan Directory</button>
+                <button onClick={handleIngestSql} className="secondary-btn btn-sm" disabled={loading}>Ingest SQL</button>
+                <button onClick={handleIngestInformatica} className="secondary-btn btn-sm" style={{ background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)', color: '#fff' }} disabled={loading}>Ingest Informatica</button>
               </div>
             </div>
 
@@ -404,7 +448,13 @@ function App() {
                   <button onClick={handleScanWorkspace} className="ingestion-btn scan-btn" disabled={loading}>
                     Scan Workspace Scripts
                   </button>
-                  <button onClick={handleSeedGraph} className="ingestion-btn seed-btn" disabled={loading}>
+                  <button onClick={handleIngestSql} className="ingestion-btn scan-btn" style={{ marginTop: '0.5rem', background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)' }} disabled={loading}>
+                    Ingest SQL Lineage
+                  </button>
+                  <button onClick={handleIngestInformatica} className="ingestion-btn scan-btn" style={{ marginTop: '0.5rem', background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)' }} disabled={loading}>
+                    Ingest Informatica XML
+                  </button>
+                  <button onClick={handleSeedGraph} className="ingestion-btn seed-btn" style={{ marginTop: '0.5rem' }} disabled={loading}>
                     Reload Demo Seed Graph
                   </button>
                 </div>

@@ -80,6 +80,20 @@ export const api = {
       body: JSON.stringify({ path, load_to_neo4j: loadToNeo4j }),
     }),
 
+  ingestSql: (directoryPath?: string) =>
+    fetchApi<{ nodes_created: number; relationships_created: number }>('/ingestion/sql', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ directory_path: directoryPath }),
+    }),
+
+  ingestInformatica: (directoryPath?: string) =>
+    fetchApi<{ nodes_created: number; relationships_created: number }>('/ingestion/informatica', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ directory_path: directoryPath }),
+    }),
+
   fetchLineage: (nodeId: string, direction: LineageDirection = 'both', depth: number = 10) =>
     api.getLineage(nodeId, direction, depth),
 
